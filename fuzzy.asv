@@ -1,0 +1,72 @@
+%% Fuzzy C-means Algorithm
+
+function [center, U, objective_funct] = fuzzy(data, cluster_n, options)
+%data takes the array of the scatter you want to find the centroids
+%cluster_n is the number of clusters
+%options an array that:
+% exponent for the matrix U             (default: 2.0)
+% maximum number of iterations          (default: 100)
+% minimum amount of improvement         (default: 1e-5)
+% info display during iteration         (default: 1)
+
+
+if nargin ~= 2 && nargin ~= 3
+	error('Too many or too few input arguments!');
+end
+data_n = size(data, 1);
+% Change the following to set default options
+default_options = [   2;  % exponent for the partition matrix U
+		            100;  % max. number of iteration
+		           1e-5;  % min. amount of improvement
+		             1];  % info display during iteration 
+if nargin == 2
+    options = default_options;
+else
+    % If "options" is not fully specified, pad it with default values.
+    if length(options) < 4
+        tmp = default_options;
+        tmp(1:length(options)) = options;
+        options = tmp;
+    end
+    % If some entries of "options" are nan's, replace them with defaults.
+    nan_index = find(isnan(options)==1);
+    options(nan_index) = default_options(nan_index);
+    if options(1) <= 1
+        error('The exponent should be greater than 1!');
+    end
+end
+lint_ball = options(1);		       % fuzzinator fuzzy factor (fuzzifier)
+%two different stop cond
+stop_iter = options(2);         % Max. iteration
+no_improve = options(3);        % Min. improvement990p-
+
+objective_funct = zeros(stop_iter, 1);  % Array for objective function
+U = rand(cluster_n, data_n);
+col_sum = sum(U);
+U = U./col_sum(ones(cluster_n, 1), :);
+sum_data_dot_data = sum(data.*data,2)';
+% main loop
+for i = 1:stop_iter
+    
+    % apply the exponential modification to the membership matrix
+    fuzzinator_factor = U.^lint_ball;       
+    % computing the euclidean distance
+    center = bsxfun(@rdivide,fuzzinator_factor*data,sum(fuzzinator_factor,2));
+    dist = bsxfun(@plus, sum_data_dot_data, sum(center.*center,2)) - 2*(center*data');
+           
+    % compute the objective function
+    objective_funct(i) = sum(sum(dist.*fuzzinator_factor));
+        
+    % compute the new membership matrix U
+    tmp = dist.^(-1/(lint_ball-1));
+    U = bsxfun(@rdivide, tmp, sum(tmp,1));
+
+	
+    % check terminating condition
+    if ( i > 1 ) &&  ( abs(objective_funct(i) - objective_funct(i-1)) < no_improve )
+        break;        
+    end
+end
+iter_n = i;	% actual number of iterations 
+objective_funct(iter_n+1:stop_iter) = [];
+
